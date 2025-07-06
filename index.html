@@ -5,10 +5,234 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Farm Game - Nông Trại Kết Nối</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background-color: #f2ffe6;
+      text-align: center;
+      padding: 10px;
+      margin: 0;
+    }
+    .farm {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+      gap: 8px;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    .plot {
+      width: 80px;
+      height: 80px;
+      border: 2px dashed #888;
+      border-radius: 10px;
+      background-color: #fffbe6;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 12px;
+      position: relative;
+    }
+    .planted {
+      background-color: #c1e1c1;
+      border: 2px solid green;
+    }
+    .controls, .status, .store, .missions, .exchange {
+      margin-bottom: 15px;
+    }
+    #inventory {
+      margin-top: 5px;
+      font-size: 14px;
+    }
+    button {
+      margin-top: 5px;
+    }
+  </style>
 </head>
 <body>
   <h2>🌾 Nông Trại Kết Nối 🌾</h2>
-  <p>Chào mừng bạn đến với nông trại ảo kết nối nông sản thật!</p>
-  <!-- Nội dung game sẽ được thêm vào ở các bước tiếp theo -->
+
+  <div class="controls">
+    <label for="seed">Chọn giống cây: </label>
+    <select id="seed">
+      <option value="carrot">🥕 Cà rốt (10 vàng)</option>
+      <option value="corn">🌽 Bắp (15 vàng)</option>
+      <option value="strawberry">🍓 Dâu (20 vàng)</option>
+      <option value="apple">🍎 Táo (25 vàng)</option>
+      <option value="mango">🥭 Xoài (30 vàng)</option>
+    </select>
+    <button onclick="buyPlot()">➕ Mở ô đất (30 vàng)</button>
+    <button onclick="expandStorage()">📦 Mở rộng kho (50 vàng)</button>
+  </div>
+
+  <div class="status">
+    <strong>💰 Vàng:</strong> <span id="gold">100</span>
+    <button onclick="addGold(50)">💳 Nạp 50 vàng</button><br/>
+    <strong>📦 Dung lượng kho:</strong> <span id="storage">0</span>/<span id="storageLimit">10</span>
+  </div>
+
+  <div class="farm" id="farm"></div>
+
+  <div class="store">
+    <h3>📦 Kho</h3>
+    <ul id="inventory"></ul>
+    <button onclick="sellAll()">🛒 Bán toàn bộ</button>
+  </div>
+
+  <div class="missions">
+    <h3>🎯 Nhiệm vụ</h3>
+    <ul>
+      <li tr-id="mission1">Trồng 3 Cà rốt (0/3)</li>
+      <li tr-id="mission2">Thu hoạch 2 Bắp (0/2)</li>
+    </ul>
+  </div>
+
+  <div class="exchange">
+    <h3>🎁 Đổi nông sản lấy hàng thật</h3>
+    <button onclick="exchangeFruit('strawberry', 10, '🍓 1 trái dâu thật')">Đổi 10 dâu lấy 1 trái dâu thật</button>
+  </div>
+
+  <script>
+    const seedTimes = {
+      carrot: 5000,
+      corn: 7000,
+      strawberry: 10000,
+      apple: 11000,
+      mango: 12000
+    };
+    const seedNames = {
+      carrot: '🥕 Cà rốt',
+      corn: '🌽 Bắp',
+      strawberry: '🍓 Dâu',
+      apple: '🍎 Táo',
+      mango: '🥭 Xoài'
+    };
+    const seedPrices = {
+      carrot: 10,
+      corn: 15,
+      strawberry: 20,
+      apple: 25,
+      mango: 30
+    };
+    const productSellPrices = {
+      carrot: 5,
+      corn: 10,
+      strawberry: 15,
+      apple: 20,
+      mango: 25
+    };
+
+    let gold = 100;
+    let storageUsed = 0;
+    let storageLimit = 10;
+    let inventory = {};
+    const missions = { carrot: 0, corn: 0 };
+    const plots = [];
+
+    const goldDisplay = document.getElementById('gold');
+    const storageDisplay = document.getElementById('storage');
+    const storageLimitDisplay = document.getElementById('storageLimit');
+    const inventoryList = document.getElementById('inventory');
+    const farm = document.getElementById('farm');
+
+    function updateGold() { goldDisplay.innerText = gold; }
+    function updateStorage() {
+      storageDisplay.innerText = storageUsed;
+      storageLimitDisplay.innerText = storageLimit;
+    }
+    function updateInventory() {
+      inventoryList.innerHTML = '';
+      for (const item in inventory) {
+        const li = document.createElement('li');
+        li.innerText = `${seedNames[item]}: ${inventory[item]}`;
+        inventoryList.appendChild(li);
+      }
+    }
+
+    function addGold(amount) { gold += amount; updateGold(); }
+    function expandStorage() {
+      if (gold >= 50) {
+        storageLimit += 10;
+        gold -= 50;
+        updateGold(); updateStorage();
+      } else alert('Không đủ vàng để mở rộng kho.');
+    }
+    function sellAll() {
+      let total = 0;
+      for (const item in inventory) {
+        total += inventory[item] * productSellPrices[item];
+        storageUsed -= inventory[item];
+      }
+      inventory = {};
+      gold += total;
+      updateGold(); updateInventory(); updateStorage();
+      alert(`Đã bán và nhận ${total} vàng.`);
+    }
+
+    function exchangeFruit(type, quantity, realItem) {
+      if ((inventory[type] || 0) >= quantity) {
+        inventory[type] -= quantity;
+        storageUsed -= quantity;
+        updateInventory(); updateStorage();
+        alert(`Đã đổi ${quantity} ${seedNames[type]} lấy ${realItem}`);
+      } else alert('Không đủ sản phẩm để đổi.');
+    }
+
+    function updateMissionDisplay() {
+      document.querySelector('[tr-id="mission1"]').innerText = `Trồng 3 Cà rốt (${missions.carrot}/3)`;
+      document.querySelector('[tr-id="mission2"]').innerText = `Thu hoạch 2 Bắp (${missions.corn}/2)`;
+    }
+
+    function plant(plot) {
+      if (!plot.dataset.seed) {
+        const seed = document.getElementById('seed').value;
+        const cost = seedPrices[seed];
+        if (gold < cost) return alert('Không đủ vàng!');
+        gold -= cost; updateGold();
+        plot.dataset.seed = seed;
+        plot.innerText = '🌱';
+        plot.classList.add('planted');
+        if (seed === 'carrot') missions.carrot++;
+        updateMissionDisplay();
+        setTimeout(() => {
+          plot.innerText = `${seedNames[seed]}
+(Thu hoạch)`;
+          plot.dataset.ready = 'true';
+        }, seedTimes[seed]);
+      } else if (plot.dataset.ready === 'true') {
+        const seed = plot.dataset.seed;
+        if (storageUsed >= storageLimit) return alert('Kho đầy!');
+        inventory[seed] = (inventory[seed] || 0) + 1;
+        storageUsed++;
+        if (seed === 'corn') missions.corn++;
+        updateInventory(); updateMissionDisplay(); updateStorage();
+        plot.innerText = 'Ô đất';
+        plot.classList.remove('planted');
+        delete plot.dataset.seed;
+        delete plot.dataset.ready;
+        if (missions.carrot === 3) { gold += 20; alert('🎉 Hoàn thành nhiệm vụ trồng cà rốt +20 vàng'); missions.carrot = 0; }
+        if (missions.corn === 2) { gold += 25; alert('🎉 Hoàn thành nhiệm vụ thu hoạch bắp +25 vàng'); missions.corn = 0; }
+        updateGold();
+      }
+    }
+
+    function addPlot() {
+      const plot = document.createElement('div');
+      plot.className = 'plot';
+      plot.innerText = 'Ô đất';
+      plot.onclick = () => plant(plot);
+      farm.appendChild(plot);
+      plots.push(plot);
+    }
+    function buyPlot() {
+      if (gold >= 30) {
+        gold -= 30; updateGold();
+        addPlot();
+      } else alert('Không đủ vàng!');
+    }
+
+    for (let i = 0; i < 3; i++) addPlot();
+    updateGold(); updateInventory(); updateStorage(); updateMissionDisplay();
+  </script>
 </body>
 </html>
